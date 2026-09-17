@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    .resx files are already MSBuild EmbeddedResource items by default, but MSBuild does not
+    expose them to Roslyn analyzers as AdditionalFiles on its own. This makes every .resx
+    EmbeddedResource item in the referencing project visible to VolocyNazad.ResxAnalyzer
+    (and to any other analyzer that reads AdditionalFiles), without requiring consumers to
+    list their .resx files by hand.
+  -->
+  <ItemGroup>
+    <AdditionalFiles Include="@(EmbeddedResource)" Condition="'%(EmbeddedResource.Extension)' == '.resx'" />
+  </ItemGroup>
+</Project>
