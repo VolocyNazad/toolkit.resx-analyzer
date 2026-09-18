@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `build/VolocyNazad.ResxAnalyzer.props` failed every consuming project's build with
+  `MSB4190: The reference to the built-in metadata "Extension" ... is not allowed in this
+  condition`. The `%(EmbeddedResource.Extension)` item-metadata reference was used in a
+  `Condition` on a plain, top-level `ItemGroup` - item metadata in a `Condition` is only valid
+  inside an MSBuild `Target`. The `AdditionalFiles` item is now added by a
+  `Target BeforeTargets="CoreCompile"` instead, which also guarantees the project's
+  default-globbed `@(EmbeddedResource)` items already exist by the time it runs.
+
 ## [1.0.0] - 2026-09-17
 
 ### Added

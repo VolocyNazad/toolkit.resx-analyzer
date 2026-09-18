@@ -1,12 +1,20 @@
 <Project>
   <!--
     .resx files are already MSBuild EmbeddedResource items by default, but MSBuild does not
-    expose them to Roslyn analyzers as AdditionalFiles on its own. This makes every .resx
+    expose them to Roslyn analyzers as AdditionalFiles on its own. This target makes every .resx
     EmbeddedResource item in the referencing project visible to VolocyNazad.ResxAnalyzer
     (and to any other analyzer that reads AdditionalFiles), without requiring consumers to
     list their .resx files by hand.
+
+    This has to run inside a Target: item metadata (%(...)) can only be referenced in a
+    Condition inside a Target, not in a static ItemGroup evaluated at project-load time -
+    referencing it there fails with MSB4191 ("item metadata cannot be applied to the item
+    type in an ItemGroup condition"). BeforeTargets="CoreCompile" also guarantees the
+    project's default-globbed @(EmbeddedResource) items already exist by the time this runs.
   -->
-  <ItemGroup>
-    <AdditionalFiles Include="@(EmbeddedResource)" Condition="'%(EmbeddedResource.Extension)' == '.resx'" />
-  </ItemGroup>
+  <Target Name="VolocyNazadResxAnalyzerAddResxAdditionalFiles" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <AdditionalFiles Include="@(EmbeddedResource)" Condition="'%(EmbeddedResource.Extension)' == '.resx'" />
+    </ItemGroup>
+  </Target>
 </Project>
