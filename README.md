@@ -10,8 +10,11 @@ resource tables: a culture-specific satellite file (`Strings.ru.resx`,
 `Strings.de.resx`, ...) missing a key from the neutral file (`Strings.resx`)
 of the same group, a satellite with a key the neutral file no longer has, a
 key declared twice in one file, a translation whose `{0}`/`{1}`/... format
-placeholders don't match the neutral value's, or a translation that's empty.
-See [Diagnostics](#diagnostics) below for the full list (RESX001-RESX005).
+placeholders don't match the neutral value's, a translation that's empty, a
+resource group that is missing a satellite file entirely for a culture that
+other resource groups in the project do have, or a satellite file that has
+no neutral file of its own at all.
+See [Diagnostics](#diagnostics) below for the full list (RESX001-RESX007).
 
 The check works on the `.resx` files themselves, so it applies no matter how
 the resources are consumed at runtime - `ResourceManager`,
@@ -43,9 +46,11 @@ Files are grouped by their path with the trailing culture segment removed.
 satellites, matched by parsing the segment before `.resx` as a
 `CultureInfo` name. A group without a neutral file (no plain
 `<Name>.resx`) is skipped for RESX001/RESX002/RESX004/RESX005, since there
-is then no key set to treat as canonical. RESX003 (duplicate key in one
-file) is checked per file and does not depend on grouping, so it still
-applies even to a satellite file with no matching neutral file.
+is then no key set to treat as canonical - it is reported by RESX007
+instead. RESX003 (duplicate key in one file) is checked per file and does
+not depend on grouping, so it still applies even to a satellite file with
+no matching neutral file. RESX006 also does not depend on a group having a
+neutral file - it compares which cultures each group has satellites for.
 
 ## Basic usage
 
@@ -62,7 +67,7 @@ building the project reports:
 warning RESX001: Resource key 'Farewell' defined in 'Strings.resx' is missing in 'Strings.ru.resx'
 ```
 
-That's one example (RESX001); the other four diagnostics fire the same way,
+That's one example (RESX001); the other six diagnostics fire the same way,
 as ordinary build warnings, whenever their condition is met - see
 [Diagnostics](#diagnostics).
 
@@ -98,6 +103,26 @@ placeholders.
 A translation value is empty or contains only whitespace - the key exists
 in the satellite file but was never actually translated. Only checked for
 satellite files, not the neutral file itself.
+
+### RESX006
+
+A resource group has no satellite `.resx` file for a culture that at least
+one other resource group in the project does have - for example,
+`Strings.ru.resx` exists but `Errors.ru.resx` doesn't. The set of "required"
+cultures is inferred automatically as the union of every culture used
+anywhere in the project; there is no configuration for it. Reported once per
+missing group/culture combination, not tied to a specific file (there is no
+missing file to point at).
+
+### RESX007
+
+A culture-specific satellite `.resx` file exists (for example
+`Strings.ru.resx`), but its group has no neutral file (`Strings.resx`) at
+all. Reported against the orphaned satellite file itself. Unlike RESX006,
+this does not depend on any other resource group - a single stray satellite
+with no neutral counterpart is enough. RESX001/RESX002/RESX004/RESX005 never
+run for such a group, since there is no neutral key set to compare against;
+RESX003 (duplicate keys) still runs independently, since it doesn't need one.
 
 ## Development documentation
 

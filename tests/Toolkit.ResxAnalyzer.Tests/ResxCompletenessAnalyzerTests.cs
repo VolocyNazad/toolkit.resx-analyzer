@@ -41,7 +41,7 @@ public sealed class ResxCompletenessAnalyzerTests
     }
 
     [Fact]
-    public async Task DoesNotReportDiagnostic_ForUnrelatedResxGroups()
+    public async Task DoesNotReportKeyDiagnostics_ForUnrelatedResxGroups()
     {
         TestAdditionalText neutralA = new("Strings.resx", CreateResx(("Greeting", "Hello")));
         TestAdditionalText neutralB = new("Errors.resx", CreateResx(("NotFound", "Not found")));
@@ -49,18 +49,95 @@ public sealed class ResxCompletenessAnalyzerTests
 
         ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(neutralA, neutralB, russianA);
 
+        // "Errors" is never compared key-by-key against "Strings.ru.resx" (that would be
+        // RESX001/002/004/005) - it only gets flagged by RESX006, since the "Errors" group has
+        // no "ru" satellite of its own while "ru" is used elsewhere in the project.
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticDescriptors.MissingCultureFileDiagnosticId, diagnostic.Id);
+    }
+
+    [Fact]
+    public async Task ReportsMissingCultureFile_WhenAnotherGroupHasACultureThisGroupLacks()
+    {
+        TestAdditionalText stringsNeutral = new("Strings.resx", CreateResx(("Greeting", "Hello")));
+        TestAdditionalText stringsRu = new("Strings.ru.resx", CreateResx(("Greeting", "Привет")));
+        TestAdditionalText errorsNeutral = new("Errors.resx", CreateResx(("NotFound", "Not found")));
+
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(stringsNeutral, stringsRu, errorsNeutral);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticDescriptors.MissingCultureFileDiagnosticId, diagnostic.Id);
+        Assert.Contains("Errors", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        Assert.Contains("ru", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DoesNotReportMissingCultureFile_WhenAllGroupsHaveTheSameCultures()
+    {
+        TestAdditionalText stringsNeutral = new("Strings.resx", CreateResx(("Greeting", "Hello")));
+        TestAdditionalText stringsRu = new("Strings.ru.resx", CreateResx(("Greeting", "Привет")));
+        TestAdditionalText errorsNeutral = new("Errors.resx", CreateResx(("NotFound", "Not found")));
+        TestAdditionalText errorsRu = new("Errors.ru.resx", CreateResx(("NotFound", "Не найдено")));
+
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(stringsNeutral, stringsRu, errorsNeutral, errorsRu);
+
         Assert.Empty(diagnostics);
     }
 
     [Fact]
-    public async Task DoesNotReportDiagnostic_WhenNoNeutralResxExistsForTheGroup()
+    public async Task ReportsMissingCultureFile_ForGroupMissingAnotherGroupsCulture()
+    {
+        TestAdditionalText stringsNeutral = new("Strings.resx", CreateResx(("Greeting", "Hello")));
+        TestAdditionalText stringsRu = new("Strings.ru.resx", CreateResx(("Greeting", "Привет")));
+        TestAdditionalText stringsDe = new("Strings.de.resx", CreateResx(("Greeting", "Hallo")));
+        TestAdditionalText errorsNeutral = new("Errors.resx", CreateResx(("NotFound", "Not found")));
+        TestAdditionalText errorsRu = new("Errors.ru.resx", CreateResx(("NotFound", "Не найдено")));
+
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(
+            stringsNeutral, stringsRu, stringsDe, errorsNeutral, errorsRu);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticDescriptors.MissingCultureFileDiagnosticId, diagnostic.Id);
+        Assert.Contains("Errors", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        Assert.Contains("de", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReportsOrphanedSatellite_WhenGroupHasNoNeutralFile()
+    {
+        TestAdditionalText russian = new("Strings.ru.resx", CreateResx(("Greeting", "Привет")));
+
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(russian);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticDescriptors.OrphanedSatelliteDiagnosticId, diagnostic.Id);
+        Assert.Contains("Strings.ru.resx", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        Assert.Contains("Strings.resx", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DoesNotReportOrphanedSatellite_WhenNeutralFileExists()
+    {
+        TestAdditionalText neutral = new("Strings.resx", CreateResx(("Greeting", "Hello")));
+        TestAdditionalText russian = new("Strings.ru.resx", CreateResx(("Greeting", "Привет")));
+
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(neutral, russian);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task DoesNotReportKeyDiagnostics_WhenNoNeutralResxExistsForTheGroup()
     {
         TestAdditionalText russian = new("Strings.ru.resx", CreateResx(("Greeting", "Привет")));
         TestAdditionalText german = new("Strings.de.resx", CreateResx());
 
         ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(russian, german);
 
-        Assert.Empty(diagnostics);
+        // No neutral file to compare keys against, so RESX001/002/004/005 never run - but both
+        // satellites are still each flagged as orphaned by RESX007.
+        Assert.Equal(2, diagnostics.Length);
+        Assert.All(diagnostics, d => Assert.Equal(DiagnosticDescriptors.OrphanedSatelliteDiagnosticId, d.Id));
     }
 
     [Fact]
@@ -139,15 +216,17 @@ public sealed class ResxCompletenessAnalyzerTests
     public async Task ReportsDuplicateKey_ForACultureFileEvenWithoutAMatchingNeutralFile()
     {
         // Duplicate-name detection runs per file, independently of grouping, so it still catches
-        // a broken satellite file even when there is no neutral file to pair it with.
+        // a broken satellite file even when there is no neutral file to pair it with - which is
+        // itself separately flagged by RESX007.
         TestAdditionalText russian = new(
             "Strings.ru.resx",
             CreateResx(("Greeting", "Привет"), ("Greeting", "Здравствуйте")));
 
         ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(russian);
 
-        Diagnostic diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(DiagnosticDescriptors.DuplicateResourceKeyDiagnosticId, diagnostic.Id);
+        Assert.Equal(2, diagnostics.Length);
+        Assert.Equal(1, diagnostics.Count(d => d.Id == DiagnosticDescriptors.DuplicateResourceKeyDiagnosticId));
+        Assert.Equal(1, diagnostics.Count(d => d.Id == DiagnosticDescriptors.OrphanedSatelliteDiagnosticId));
     }
 
     [Fact]

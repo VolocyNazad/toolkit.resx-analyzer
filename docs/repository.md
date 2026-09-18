@@ -15,6 +15,8 @@ file such as `Strings.resx` plus its culture-specific satellites, e.g.
 - **RESX003** - the same key is declared twice within one `.resx` file.
 - **RESX004** - a translation's `{0}`, `{1}`, ... placeholders don't match the neutral value's.
 - **RESX005** - a satellite translation is empty or whitespace-only.
+- **RESX006** - a resource group has no satellite file for a culture used by other groups in the project.
+- **RESX007** - a satellite file exists but its group has no neutral file at all.
 
 It is a plain analyzer package with no Revit API or WPF dependency, usable in
 any C# project that ships localized `.resx` resources - independent of how
@@ -32,8 +34,8 @@ project, unlike `toolkit.xaml-constructor`.
 .
 ├── src/
 │   └── Toolkit.ResxAnalyzer/
-│       ├── DiagnosticDescriptors.cs       RESX001-RESX005 descriptors
-│       ├── ResxCompletenessAnalyzer.cs    the DiagnosticAnalyzer (all 5 rules)
+│       ├── DiagnosticDescriptors.cs       RESX001-RESX007 descriptors
+│       ├── ResxCompletenessAnalyzer.cs    the DiagnosticAnalyzer (all 7 rules)
 │       ├── ResxDocument.cs                .resx -> resource entries (name + value)
 │       ├── ResxResourceName.cs            file name -> (group, culture) parsing
 │       ├── AnalyzerReleases.Shipped.md
@@ -101,11 +103,15 @@ The root `.editorconfig` defines the portable formatting baseline. Existing repo
 
 The automated test suite is in `tests/Toolkit.ResxAnalyzer.Tests` and verifies
 resource-group matching (culture parsing, missing-neutral-file skip) and all
-five diagnostics: RESX001 (missing keys, including several at once and
+seven diagnostics: RESX001 (missing keys, including several at once and
 unrelated groups), RESX002 (orphaned satellite keys), RESX003 (duplicate keys,
 including in a satellite file with no neutral counterpart), RESX004
-(mismatched placeholders, placeholder order, escaped braces), and RESX005
-(empty/whitespace translations, and that the neutral file itself is exempt).
+(mismatched placeholders, placeholder order, escaped braces), RESX005
+(empty/whitespace translations, and that the neutral file itself is exempt),
+RESX006 (a group missing another group's culture, and that groups sharing
+the same cultures produce no diagnostic), and RESX007 (a satellite file with
+no neutral file for its group, and that a satellite with a neutral file
+present produces no diagnostic).
 
 ## Versioning and release tags
 

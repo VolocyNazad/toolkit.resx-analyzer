@@ -9,21 +9,25 @@ namespace Toolkit.ResxAnalyzer;
 
 /// <summary>
 /// Inspects .resx resource groups (a neutral file such as <c>Strings.resx</c> plus its
-/// culture-specific satellites, e.g. <c>Strings.ru.resx</c>) and reports RESX001-RESX005:
+/// culture-specific satellites, e.g. <c>Strings.ru.resx</c>) and reports RESX001-RESX007:
 /// missing keys, orphaned keys, duplicate keys within one file, mismatched format placeholders,
-/// and empty translations.
+/// empty translations, resource groups missing a satellite file for a culture that is present
+/// in other resource groups in the project, and satellite files that have no neutral file at
+/// all.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
 {
-    private static readonly Regex PlaceholderPattern = new(@"\{(\d+)(?:,-?\d+)?(?::[^{}]*)?\}");
+    private static readonly Regex PlaceholderPattern = new(@"\{(\d+)(?:,-?\d+)?(?::[^{}]*)?\}", RegexOptions.None, TimeSpan.FromSeconds(1));
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(
         DiagnosticDescriptors.MissingResourceKeyRule,
         DiagnosticDescriptors.ExtraResourceKeyRule,
         DiagnosticDescriptors.DuplicateResourceKeyRule,
         DiagnosticDescriptors.MismatchedPlaceholdersRule,
-        DiagnosticDescriptors.EmptyResourceValueRule);
+        DiagnosticDescriptors.EmptyResourceValueRule,
+        DiagnosticDescriptors.MissingCultureFileRule,
+        DiagnosticDescriptors.OrphanedSatelliteRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -49,15 +53,27 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
             AnalyzeDuplicates(context, file);
         }
 
-        foreach (ResourceGroup group in GroupResxFiles(resxFiles, context.CancellationToken))
+        ImmutableArray<ResourceGroup> groups = [.. GroupResxFiles(resxFiles, context.CancellationToken)];
+
+        foreach (ResourceGroup group in groups)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            if (group.Neutral is null || group.Cultures.Count == 0)
+            if (group.Neutral is null)
+            {
+                if (group.Cultures.Count > 0)
+                    AnalyzeOrphanedSatellites(context, group);
+
+                continue;
+            }
+
+            if (group.Cultures.Count == 0)
                 continue;
 
             AnalyzeGroup(context, group);
         }
+
+        AnalyzeRequiredCultures(context, groups);
     }
 
     private static IEnumerable<ResourceGroup> GroupResxFiles(ImmutableArray<AdditionalText> resxFiles, CancellationToken cancellationToken)
@@ -80,7 +96,7 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
             if (culture is null)
                 group.Neutral = file;
             else
-                group.Cultures.Add(file);
+                group.Cultures[culture.Name] = file;
         }
 
         return groups.Values;
@@ -129,10 +145,26 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
 
         string neutralFileName = Path.GetFileName(neutralFile.Path);
 
-        foreach (AdditionalText cultureFile in group.Cultures)
+        foreach (AdditionalText cultureFile in group.Cultures.Values)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             AnalyzeCulture(context, neutralFileName, neutralEntries, cultureFile);
+        }
+    }
+
+    private static void AnalyzeOrphanedSatellites(CompilationAnalysisContext context, ResourceGroup group)
+    {
+        string expectedNeutralFileName = GetGroupDisplayName(group) + ".resx";
+
+        foreach (string satellitePath in group.Cultures.Values.Select(satelliteFile => satelliteFile.Path))
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.OrphanedSatelliteRule,
+                CreateLocation(satellitePath),
+                Path.GetFileName(satellitePath),
+                expectedNeutralFileName));
         }
     }
 
@@ -196,6 +228,52 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    private static void AnalyzeRequiredCultures(CompilationAnalysisContext context, ImmutableArray<ResourceGroup> groups)
+    {
+        // A culture is "required" project-wide once at least one resource group has a satellite
+        // file for it; every other group is then expected to have a matching file for that same
+        // culture. This is deliberately not scoped to comparing keys within a group - it only
+        // checks that the .resx file itself exists.
+        string[] requiredCultureNames = [.. groups
+            .SelectMany(group => group.Cultures.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+
+        if (requiredCultureNames.Length == 0)
+            return;
+
+        foreach (ResourceGroup group in groups)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            string groupName = GetGroupDisplayName(group);
+
+            foreach (string cultureName in requiredCultureNames.Where(name => !group.Cultures.ContainsKey(name)))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.MissingCultureFileRule,
+                    Location.None,
+                    groupName,
+                    cultureName));
+            }
+        }
+    }
+
+    private static string GetGroupDisplayName(ResourceGroup group)
+    {
+        if (group.Neutral is not null)
+            return Path.GetFileNameWithoutExtension(group.Neutral.Path);
+
+        // No neutral file: fall back to the first satellite, with its own culture segment
+        // stripped back off (e.g. "Errors.ru" -> "Errors").
+        KeyValuePair<string, AdditionalText> first = group.Cultures.First();
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(first.Value.Path);
+        string cultureSuffix = "." + first.Key;
+
+        return fileNameWithoutExtension.EndsWith(cultureSuffix, StringComparison.OrdinalIgnoreCase)
+            ? fileNameWithoutExtension.Substring(0, fileNameWithoutExtension.Length - cultureSuffix.Length)
+            : fileNameWithoutExtension;
+    }
+
     private static Dictionary<string, string> ToFirstOccurrenceMap(ImmutableArray<ResxEntry> entries)
     {
         // Duplicate names within one file are reported by AnalyzeDuplicates (RESX003); here the
@@ -237,6 +315,7 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
     {
         public AdditionalText? Neutral { get; set; }
 
-        public List<AdditionalText> Cultures { get; } = [];
+        /// <summary>Satellite files in this group, keyed by their parsed culture name.</summary>
+        public Dictionary<string, AdditionalText> Cultures { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

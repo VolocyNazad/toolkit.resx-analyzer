@@ -9,6 +9,8 @@ public static class DiagnosticDescriptors
     public const string DuplicateResourceKeyDiagnosticId = "RESX003";
     public const string MismatchedPlaceholdersDiagnosticId = "RESX004";
     public const string EmptyResourceValueDiagnosticId = "RESX005";
+    public const string MissingCultureFileDiagnosticId = "RESX006";
+    public const string OrphanedSatelliteDiagnosticId = "RESX007";
 
     public static readonly DiagnosticDescriptor MissingResourceKeyRule = CreateRule(
         MissingResourceKeyDiagnosticId,
@@ -34,6 +36,16 @@ public static class DiagnosticDescriptors
         EmptyResourceValueDiagnosticId,
         "Resource translation is empty",
         "Resource key '{0}' in '{1}' has an empty or whitespace-only value");
+
+    public static readonly DiagnosticDescriptor MissingCultureFileRule = CreateRule(
+        MissingCultureFileDiagnosticId,
+        "Resource group is missing a required localization file",
+        "Resource group '{0}' has no '{1}' resource file, but '{1}' is used by other resource groups in the project");
+
+    public static readonly DiagnosticDescriptor OrphanedSatelliteRule = CreateRule(
+        OrphanedSatelliteDiagnosticId,
+        "Satellite resource file has no neutral resource file",
+        "'{0}' is a culture-specific satellite resource file, but its neutral resource file '{1}' does not exist");
 
     private static DiagnosticDescriptor CreateRule(string id, string title, string messageFormat, DiagnosticSeverity severity = DiagnosticSeverity.Warning)
     {

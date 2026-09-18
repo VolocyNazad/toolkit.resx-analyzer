@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- RESX006: warn when a resource group has no satellite `.resx` file for a culture that at
+  least one other resource group in the project does have (for example, `Strings.ru.resx`
+  exists but `Errors.ru.resx` doesn't). The set of required cultures is inferred automatically
+  as the union of every culture used anywhere in the project - there is no configuration for
+  it. Reported once per missing group/culture combination, at the project level rather than
+  against a specific file, since there is no file to point at.
+- RESX007: warn when a culture-specific satellite `.resx` file (for example `Strings.ru.resx`)
+  exists but its group has no neutral file (`Strings.resx`) at all. Reported against the
+  orphaned satellite file itself; unlike RESX006, this doesn't depend on any other resource
+  group existing.
+
 ## [1.0.1] - 2026-09-18
 
 ### Fixed
