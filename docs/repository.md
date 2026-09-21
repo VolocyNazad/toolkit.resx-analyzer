@@ -121,3 +121,11 @@ checked).
 ## Versioning and release tags
 
 The package uses MinVer 8 with stable tags in the `vMAJOR.MINOR.PATCH` format. The tag without its `v` prefix is the NuGet package version. Manual publishing accepts exactly one matching tag at HEAD and verifies the package ID and version before pushing to NuGet.
+
+Bump component, applied to analyzer-behavior changes:
+
+- **MAJOR** - a breaking change: an existing rule starts firing where it previously didn't (or vice versa) for cases users are likely already relying on, a diagnostic ID's meaning changes, a rule is removed, or the minimum supported Microsoft.CodeAnalysis/Visual Studio baseline moves.
+- **MINOR** - a new rule (a new RESXxxx diagnostic ID) is added, or an existing rule gains new, opt-in configuration that is disabled by default (such as RESX008's `.editorconfig` options).
+- **PATCH** - a bug fix to an existing rule's detection logic (including a false positive/negative fix), packaging/build fixes (such as the RESX-file-to-`AdditionalFiles` wiring), and documentation-only changes.
+
+This mirrors ordinary SemVer, scoped to what actually changes for a consumer of the package: adding a diagnostic is additive (MINOR) even though it can make a previously-clean build start warning, because the new rule is new surface area, not a change to existing behavior.
