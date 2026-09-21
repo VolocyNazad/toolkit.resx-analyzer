@@ -17,6 +17,7 @@ file such as `Strings.resx` plus its culture-specific satellites, e.g.
 - **RESX005** - a satellite translation is empty or whitespace-only.
 - **RESX006** - a resource group has no satellite file for a culture used by other groups in the project.
 - **RESX007** - a satellite file exists but its group has no neutral file at all.
+- **RESX008** - a resource key doesn't match a configured naming convention (opt-in, via `.editorconfig`).
 
 It is a plain analyzer package with no Revit API or WPF dependency, usable in
 any C# project that ships localized `.resx` resources - independent of how
@@ -34,10 +35,11 @@ project, unlike `toolkit.xaml-constructor`.
 .
 ├── src/
 │   └── Toolkit.ResxAnalyzer/
-│       ├── DiagnosticDescriptors.cs       RESX001-RESX007 descriptors
-│       ├── ResxCompletenessAnalyzer.cs    the DiagnosticAnalyzer (all 7 rules)
+│       ├── DiagnosticDescriptors.cs       RESX001-RESX008 descriptors
+│       ├── ResxCompletenessAnalyzer.cs    the DiagnosticAnalyzer (all 8 rules)
 │       ├── ResxDocument.cs                .resx -> resource entries (name + value)
 │       ├── ResxResourceName.cs            file name -> (group, culture) parsing
+│       ├── KeyNamingConvention.cs         RESX008 .editorconfig options + validation
 │       ├── AnalyzerReleases.Shipped.md
 │       ├── AnalyzerReleases.Unshipped.md
 │       └── build/
@@ -103,15 +105,18 @@ The root `.editorconfig` defines the portable formatting baseline. Existing repo
 
 The automated test suite is in `tests/Toolkit.ResxAnalyzer.Tests` and verifies
 resource-group matching (culture parsing, missing-neutral-file skip) and all
-seven diagnostics: RESX001 (missing keys, including several at once and
+eight diagnostics: RESX001 (missing keys, including several at once and
 unrelated groups), RESX002 (orphaned satellite keys), RESX003 (duplicate keys,
 including in a satellite file with no neutral counterpart), RESX004
 (mismatched placeholders, placeholder order, escaped braces), RESX005
 (empty/whitespace translations, and that the neutral file itself is exempt),
 RESX006 (a group missing another group's culture, and that groups sharing
-the same cultures produce no diagnostic), and RESX007 (a satellite file with
+the same cultures produce no diagnostic), RESX007 (a satellite file with
 no neutral file for its group, and that a satellite with a neutral file
-present produces no diagnostic).
+present produces no diagnostic), and RESX008 (PascalCase/camelCase/
+hierarchical/custom-regex conventions, an unconfigured or unrecognized
+convention producing no diagnostic, and orphaned-satellite keys still being
+checked).
 
 ## Versioning and release tags
 

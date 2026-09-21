@@ -9,11 +9,12 @@ namespace Toolkit.ResxAnalyzer;
 
 /// <summary>
 /// Inspects .resx resource groups (a neutral file such as <c>Strings.resx</c> plus its
-/// culture-specific satellites, e.g. <c>Strings.ru.resx</c>) and reports RESX001-RESX007:
+/// culture-specific satellites, e.g. <c>Strings.ru.resx</c>) and reports RESX001-RESX008:
 /// missing keys, orphaned keys, duplicate keys within one file, mismatched format placeholders,
 /// empty translations, resource groups missing a satellite file for a culture that is present
-/// in other resource groups in the project, and satellite files that have no neutral file at
-/// all.
+/// in other resource groups in the project, satellite files that have no neutral file at all,
+/// and (when a naming convention is configured via .editorconfig) resource keys that do not
+/// match it.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp, LanguageNames.VisualBasic)]
 public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
@@ -27,7 +28,8 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
         DiagnosticDescriptors.MismatchedPlaceholdersRule,
         DiagnosticDescriptors.EmptyResourceValueRule,
         DiagnosticDescriptors.MissingCultureFileRule,
-        DiagnosticDescriptors.OrphanedSatelliteRule);
+        DiagnosticDescriptors.OrphanedSatelliteRule,
+        DiagnosticDescriptors.KeyNamingConventionRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -67,9 +69,9 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            if (group.Cultures.Count == 0)
-                continue;
-
+            // Always analyze the neutral file's own keys (RESX008 naming), even for a group with
+            // no satellites yet - the key-by-key completeness checks below only apply once a
+            // satellite exists to compare against.
             AnalyzeGroup(context, group);
         }
 
@@ -143,6 +145,8 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
         if (neutralEntries.Count == 0)
             return;
 
+        AnalyzeKeyNaming(context, neutralFile, neutralEntries.Keys);
+
         string neutralFileName = Path.GetFileName(neutralFile.Path);
 
         foreach (AdditionalText cultureFile in group.Cultures.Values)
@@ -152,19 +156,46 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    private static void AnalyzeKeyNaming(CompilationAnalysisContext context, AdditionalText file, IEnumerable<string> keys)
+    {
+        KeyNamingOptions? namingOptions = KeyNamingOptions.Read(context.Options.AnalyzerConfigOptionsProvider, file);
+        if (namingOptions is null)
+            return;
+
+        Location location = CreateLocation(file.Path);
+        string fileName = Path.GetFileName(file.Path);
+
+        foreach (string key in keys.Where(key => !namingOptions.IsValid(key)))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                DiagnosticDescriptors.KeyNamingConventionRule,
+                location,
+                key,
+                fileName,
+                namingOptions.DisplayName));
+        }
+    }
+
     private static void AnalyzeOrphanedSatellites(CompilationAnalysisContext context, ResourceGroup group)
     {
         string expectedNeutralFileName = GetGroupDisplayName(group) + ".resx";
 
-        foreach (string satellitePath in group.Cultures.Values.Select(satelliteFile => satelliteFile.Path))
+        foreach (AdditionalText satelliteFile in group.Cultures.Values)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
             context.ReportDiagnostic(Diagnostic.Create(
                 DiagnosticDescriptors.OrphanedSatelliteRule,
-                CreateLocation(satellitePath),
-                Path.GetFileName(satellitePath),
+                CreateLocation(satelliteFile.Path),
+                Path.GetFileName(satelliteFile.Path),
                 expectedNeutralFileName));
+
+            SourceText? satelliteText = satelliteFile.GetText(context.CancellationToken);
+            if (satelliteText is null)
+                continue;
+
+            Dictionary<string, string> satelliteEntries = ToFirstOccurrenceMap(ResxDocument.ReadEntries(satelliteText.ToString()));
+            AnalyzeKeyNaming(context, satelliteFile, satelliteEntries.Keys);
         }
     }
 

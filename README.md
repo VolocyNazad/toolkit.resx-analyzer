@@ -12,9 +12,10 @@ of the same group, a satellite with a key the neutral file no longer has, a
 key declared twice in one file, a translation whose `{0}`/`{1}`/... format
 placeholders don't match the neutral value's, a translation that's empty, a
 resource group that is missing a satellite file entirely for a culture that
-other resource groups in the project do have, or a satellite file that has
-no neutral file of its own at all.
-See [Diagnostics](#diagnostics) below for the full list (RESX001-RESX007).
+other resource groups in the project do have, a satellite file that has
+no neutral file of its own at all, or (opt-in) a resource key that does not
+match a configured naming convention.
+See [Diagnostics](#diagnostics) below for the full list (RESX001-RESX008).
 
 The check works on the `.resx` files themselves, so it applies no matter how
 the resources are consumed at runtime - `ResourceManager`,
@@ -67,8 +68,8 @@ building the project reports:
 warning RESX001: Resource key 'Farewell' defined in 'Strings.resx' is missing in 'Strings.ru.resx'
 ```
 
-That's one example (RESX001); the other six diagnostics fire the same way,
-as ordinary build warnings, whenever their condition is met - see
+That's one example (RESX001); the other diagnostics fire the same way, as
+ordinary build warnings, whenever their condition is met - see
 [Diagnostics](#diagnostics).
 
 ## Diagnostics
@@ -123,6 +124,39 @@ this does not depend on any other resource group - a single stray satellite
 with no neutral counterpart is enough. RESX001/RESX002/RESX004/RESX005 never
 run for such a group, since there is no neutral key set to compare against;
 RESX003 (duplicate keys) still runs independently, since it doesn't need one.
+
+### RESX008
+
+A resource key's name does not match a configured naming convention. This
+rule is opt-in and does nothing unless a convention is configured - it is
+the only diagnostic controlled by `.editorconfig` rather than firing
+unconditionally. Configure it under a `[*.resx]` section:
+
+```ini
+[*.resx]
+resx_analyzer.key_naming_convention = PascalCase
+```
+
+Supported values for `resx_analyzer.key_naming_convention`:
+
+- `PascalCase` - e.g. `SaveButtonText`.
+- `camelCase` - e.g. `saveButtonText`.
+- `snake_case` - e.g. `save_button_text`.
+- `kebab-case` - e.g. `save-button-text`.
+- `hierarchical` - the key is split on a separator (`.` by default,
+  configurable via `resx_analyzer.key_naming_hierarchical_separator`) and
+  each segment is checked against a sub-convention (`PascalCase` by default,
+  configurable via
+  `resx_analyzer.key_naming_hierarchical_segment_convention`) - e.g.
+  `Login.SaveButton.Text`.
+- `custom` (alias `regex`) - the key must fully match a pattern supplied via
+  `resx_analyzer.key_naming_regex`.
+
+An unrecognized or missing value leaves the rule disabled - nothing is
+checked. Checked against every group's neutral file (and, since there is no
+neutral file to prefer, against orphaned satellites reported by RESX007 as
+well), so each key is validated once regardless of how many satellites
+exist.
 
 ## Development documentation
 

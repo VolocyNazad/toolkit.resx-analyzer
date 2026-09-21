@@ -299,7 +299,97 @@ public sealed class ResxCompletenessAnalyzerTests
         Assert.Empty(diagnostics);
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(params AdditionalText[] additionalFiles)
+    [Fact]
+    public async Task DoesNotReportKeyNaming_WhenNoConventionIsConfigured()
+    {
+        TestAdditionalText neutral = new("Strings.resx", CreateResx(("not_pascal_case", "Hello")));
+
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync((Dictionary<string, string>?)null, neutral);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsKeyNamingViolation_WhenKeyDoesNotMatchConfiguredPascalCaseConvention()
+    {
+        TestAdditionalText neutral = new("Strings.resx", CreateResx(("greeting_text", "Hello"), ("ValidKey", "World")));
+
+        Dictionary<string, string> configOptions = new() { ["resx_analyzer.key_naming_convention"] = "PascalCase" };
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(configOptions, neutral);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticDescriptors.KeyNamingConventionDiagnosticId, diagnostic.Id);
+        Assert.Contains("greeting_text", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DoesNotReportKeyNamingViolation_WhenAllKeysMatchConfiguredCamelCaseConvention()
+    {
+        TestAdditionalText neutral = new("Strings.resx", CreateResx(("greetingText", "Hello"), ("farewellText", "Bye")));
+
+        Dictionary<string, string> configOptions = new() { ["resx_analyzer.key_naming_convention"] = "camelCase" };
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(configOptions, neutral);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsKeyNamingViolation_ForHierarchicalConventionWithDefaultDotSeparator()
+    {
+        TestAdditionalText neutral = new("Strings.resx", CreateResx(("Login.button_text", "Sign in"), ("Login.Title", "Login")));
+
+        Dictionary<string, string> configOptions = new() { ["resx_analyzer.key_naming_convention"] = "hierarchical" };
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(configOptions, neutral);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(DiagnosticDescriptors.KeyNamingConventionDiagnosticId, diagnostic.Id);
+        Assert.Contains("Login.button_text", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReportsKeyNamingViolation_ForCustomRegexConvention()
+    {
+        TestAdditionalText neutral = new("Strings.resx", CreateResx(("SCREAMING_KEY", "Hello"), ("lower_key", "Bye")));
+
+        Dictionary<string, string> configOptions = new()
+        {
+            ["resx_analyzer.key_naming_convention"] = "custom",
+            ["resx_analyzer.key_naming_regex"] = "[A-Z_]+",
+        };
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(configOptions, neutral);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Contains("lower_key", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DoesNotReportKeyNaming_WhenConventionValueIsUnrecognized()
+    {
+        TestAdditionalText neutral = new("Strings.resx", CreateResx(("not_pascal_case", "Hello")));
+
+        Dictionary<string, string> configOptions = new() { ["resx_analyzer.key_naming_convention"] = "screaming_snake_case" };
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(configOptions, neutral);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsKeyNamingViolation_ForOrphanedSatelliteKeysToo()
+    {
+        TestAdditionalText russian = new("Strings.ru.resx", CreateResx(("not_pascal_case", "Привет")));
+
+        Dictionary<string, string> configOptions = new() { ["resx_analyzer.key_naming_convention"] = "PascalCase" };
+        ImmutableArray<Diagnostic> diagnostics = await GetDiagnosticsAsync(configOptions, russian);
+
+        Assert.Equal(2, diagnostics.Length);
+        Assert.Contains(diagnostics, d => d.Id == DiagnosticDescriptors.OrphanedSatelliteDiagnosticId);
+        Assert.Contains(diagnostics, d => d.Id == DiagnosticDescriptors.KeyNamingConventionDiagnosticId);
+    }
+
+    private static Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(params AdditionalText[] additionalFiles)
+        => GetDiagnosticsAsync(null, additionalFiles);
+
+    private static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(Dictionary<string, string>? configOptions, params AdditionalText[] additionalFiles)
     {
         CSharpCompilation compilation = CSharpCompilation.Create(
             "Tests",
@@ -307,7 +397,7 @@ public sealed class ResxCompletenessAnalyzerTests
             CompilationFactory.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-        AnalyzerOptions options = new([.. additionalFiles]);
+        AnalyzerOptions options = new([.. additionalFiles], new TestAnalyzerConfigOptionsProvider(configOptions));
         CompilationWithAnalyzers compilationWithAnalyzers = compilation.WithAnalyzers(
             [new ResxCompletenessAnalyzer()],
             options);

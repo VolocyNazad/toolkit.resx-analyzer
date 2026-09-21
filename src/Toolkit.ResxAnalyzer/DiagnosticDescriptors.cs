@@ -11,6 +11,7 @@ public static class DiagnosticDescriptors
     public const string EmptyResourceValueDiagnosticId = "RESX005";
     public const string MissingCultureFileDiagnosticId = "RESX006";
     public const string OrphanedSatelliteDiagnosticId = "RESX007";
+    public const string KeyNamingConventionDiagnosticId = "RESX008";
 
     public static readonly DiagnosticDescriptor MissingResourceKeyRule = CreateRule(
         MissingResourceKeyDiagnosticId,
@@ -46,6 +47,11 @@ public static class DiagnosticDescriptors
         OrphanedSatelliteDiagnosticId,
         "Satellite resource file has no neutral resource file",
         "'{0}' is a culture-specific satellite resource file, but its neutral resource file '{1}' does not exist");
+
+    public static readonly DiagnosticDescriptor KeyNamingConventionRule = CreateRule(
+        KeyNamingConventionDiagnosticId,
+        "Resource key does not match the configured naming convention",
+        "Resource key '{0}' in '{1}' does not match the configured naming convention '{2}'");
 
     private static DiagnosticDescriptor CreateRule(string id, string title, string messageFormat, DiagnosticSeverity severity = DiagnosticSeverity.Warning)
     {
