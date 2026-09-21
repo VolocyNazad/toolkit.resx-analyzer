@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-21
+
+### Added
+
+- RESX008: warn when a resource key's name does not match a configured naming convention.
+  Opt-in - does nothing unless `resx_analyzer.key_naming_convention` is set (typically under
+  a `[*.resx]` section in `.editorconfig`); an unset or unrecognized value leaves the rule
+  disabled. Supports `PascalCase`, `camelCase`, `snake_case`, `kebab-case`, `hierarchical`
+  (separator- and per-segment-configurable), and `custom` (a full regex via
+  `resx_analyzer.key_naming_regex`). Checked against each group's neutral file, and against
+  orphaned satellites reported by RESX007 (which have no neutral file to check instead).
+
 ## [1.1.0] - 2026-09-18
 
 ### Added
