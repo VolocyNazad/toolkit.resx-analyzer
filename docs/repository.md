@@ -129,3 +129,5 @@ Bump component, applied to analyzer-behavior changes:
 - **PATCH** - a bug fix to an existing rule's detection logic (including a false positive/negative fix), packaging/build fixes (such as the RESX-file-to-`AdditionalFiles` wiring), and documentation-only changes.
 
 This mirrors ordinary SemVer, scoped to what actually changes for a consumer of the package: adding a diagnostic is additive (MINOR) even though it can make a previously-clean build start warning, because the new rule is new surface area, not a change to existing behavior.
+
+The tagged commit must already contain the release section in `CHANGELOG.md` with an empty `Unreleased` section above it; the publish workflow stops otherwise. See the [release changelog policy](policies/development.md#release-changelog).
