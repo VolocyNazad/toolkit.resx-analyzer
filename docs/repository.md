@@ -60,12 +60,18 @@ project, unlike `toolkit.xaml-constructor`.
   so the package does not flow as a normal compile-time dependency to
   consumers of a library that references it.
 - Central package management (`Directory.Packages.props`,
-  `ManagePackageVersionsCentrally=true`), matching `toolkit.xaml-constructor`.
+  `ManagePackageVersionsCentrally=true`), matching `toolkit.xaml-constructor`:
+  project packages are versioned in the root file, and
+  `tests/Directory.Packages.props` imports it to version test-only packages
+  separately.
 - Repo-wide global analyzers pinned in `Directory.Packages.props`:
   Roslynator.Analyzers, SonarAnalyzer.CSharp.
-- `Microsoft.CodeAnalysis` / `.CSharp` are exact-pinned (`[4.14.0]`) - the
-  Roslyn version shipped with the latest Visual Studio 2022 17.14 line, so
-  the analyzer stays loadable by any current VS 2022 install. See the
+- `Microsoft.CodeAnalysis` / `.CSharp` are exact-pinned (`[4.14.0]`) in the CPM
+  files (`Microsoft.CodeAnalysis` and `.CSharp` in
+  `tests/Directory.Packages.props`, `Microsoft.CodeAnalysis.Common` in
+  `Directory.Packages.props`) - the Roslyn version shipped with the latest
+  Visual Studio 2022 17.14 line, so the analyzer stays loadable by any current
+  VS 2022 install. See the
   [Roslyn compatibility policy](policies/development.md#roslyn-compatibility).
 - MinVer with the `v` tag prefix, as configured by `MinVerTagPrefix` in
   `Directory.Build.props`.

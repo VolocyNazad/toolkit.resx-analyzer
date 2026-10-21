@@ -18,6 +18,7 @@
     <File Path="NuGet.config" />
   </Folder>
   <Folder Name="/tests/">
+    <File Path="tests/Directory.Packages.props" />
     <Project Path="tests/Toolkit.ResxAnalyzer.Tests/Toolkit.ResxAnalyzer.Tests.csproj" />
   </Folder>
   <Project Path="src/Toolkit.ResxAnalyzer/Toolkit.ResxAnalyzer.csproj" />

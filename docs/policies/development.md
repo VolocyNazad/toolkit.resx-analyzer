@@ -29,6 +29,12 @@ Use the repository-root `global.json` for local builds and CI: SDK `10.0.103` or
 
 Keep the root solution in sync with existing repository-level documentation, license, Git/editor settings, SDK/NuGet/versioning and shared MSBuild configuration, and root maintenance scripts. Expose root files under `solutionItems`, `.github/` and `scripts/` under matching subfolders, and documentation under `docs/` with its directory hierarchy. Add, rename or remove solution links together with the corresponding files. Include only existing files, once each; exclude local settings, secrets and generated output. Solution templates must follow the same convention.
 
+## Central package management
+
+Keep project package versions in the root `Directory.Packages.props`. Test-only
+packages belong in `tests/Directory.Packages.props`, which imports the root file;
+do not add `Version` attributes to individual `PackageReference` items.
+
 ## Repository validation
 
 Run `./scripts/Validate-Repository.ps1` after changing repository-level files,

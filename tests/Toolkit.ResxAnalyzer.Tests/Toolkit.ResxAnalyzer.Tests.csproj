@@ -28,32 +28,4 @@
     <ProjectReference Include="..\..\src\Toolkit.ResxAnalyzer\Toolkit.ResxAnalyzer.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageVersion Update="MinVer" Version="8.0.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Update="MinVer">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageVersion Update="Roslynator.Analyzers" Version="5.0.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Update="Roslynator.Analyzers">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageVersion Update="SonarAnalyzer.CSharp" Version="10.33.0.1635" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Update="SonarAnalyzer.CSharp">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-
 </Project>
