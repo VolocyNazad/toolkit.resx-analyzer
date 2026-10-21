@@ -8,12 +8,12 @@ namespace Toolkit.ResxAnalyzer;
 /// </summary>
 internal enum NamingConventionKind
 {
-    PascalCase,
-    CamelCase,
-    SnakeCase,
-    KebabCase,
-    Hierarchical,
-    Custom,
+    PascalCase = 0,
+    CamelCase = 1,
+    SnakeCase = 2,
+    KebabCase = 3,
+    Hierarchical = 4,
+    Custom = 5,
 }
 
 /// <summary>
@@ -33,10 +33,10 @@ internal sealed class KeyNamingOptions
     private const string SeparatorOption = "resx_analyzer.key_naming_hierarchical_separator";
     private const string SegmentConventionOption = "resx_analyzer.key_naming_hierarchical_segment_convention";
 
-    private static readonly Regex PascalCasePattern = new(@"^[A-Z][A-Za-z0-9]*$", RegexOptions.None, TimeSpan.FromSeconds(1));
-    private static readonly Regex CamelCasePattern = new(@"^[a-z][A-Za-z0-9]*$", RegexOptions.None, TimeSpan.FromSeconds(1));
-    private static readonly Regex SnakeCasePattern = new(@"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$", RegexOptions.None, TimeSpan.FromSeconds(1));
-    private static readonly Regex KebabCasePattern = new(@"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", RegexOptions.None, TimeSpan.FromSeconds(1));
+    private static readonly Regex PascalCasePattern = new("^[A-Z][A-Za-z0-9]*$", RegexOptions.None, TimeSpan.FromSeconds(1));
+    private static readonly Regex CamelCasePattern = new("^[a-z][A-Za-z0-9]*$", RegexOptions.None, TimeSpan.FromSeconds(1));
+    private static readonly Regex SnakeCasePattern = new("^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$", RegexOptions.None, TimeSpan.FromSeconds(1));
+    private static readonly Regex KebabCasePattern = new("^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", RegexOptions.None, TimeSpan.FromSeconds(1));
 
     private KeyNamingOptions(NamingConventionKind convention, string displayName, Regex? customPattern, string separator, NamingConventionKind segmentConvention)
     {
@@ -62,6 +62,8 @@ internal sealed class KeyNamingOptions
     /// Reads RESX008 configuration that applies to <paramref name="file"/>. Returns null when the
     /// rule is not configured (or is misconfigured) for that file, meaning it should not run.
     /// </summary>
+    /// <param name="provider">The analyzer config options provider.</param>
+    /// <param name="file">The file whose options are read.</param>
     public static KeyNamingOptions? Read(AnalyzerConfigOptionsProvider provider, Microsoft.CodeAnalysis.AdditionalText file)
     {
         AnalyzerConfigOptions options = provider.GetOptions(file);
@@ -105,6 +107,7 @@ internal sealed class KeyNamingOptions
     }
 
     /// <summary>Checks whether <paramref name="key"/> matches this configuration's convention.</summary>
+    /// <param name="key">The resource key to validate.</param>
     public bool IsValid(string key)
     {
         if (string.IsNullOrEmpty(key))
@@ -122,14 +125,19 @@ internal sealed class KeyNamingOptions
         return segments.Length > 0 && segments.All(segment => segment.Length > 0 && segmentPattern.IsMatch(segment));
     }
 
-    private static Regex GetPattern(NamingConventionKind convention) => convention switch
+    private static Regex GetPattern(NamingConventionKind convention)
     {
-        NamingConventionKind.PascalCase => PascalCasePattern,
-        NamingConventionKind.CamelCase => CamelCasePattern,
-        NamingConventionKind.SnakeCase => SnakeCasePattern,
-        NamingConventionKind.KebabCase => KebabCasePattern,
-        _ => PascalCasePattern,
-    };
+        return convention switch
+        {
+            NamingConventionKind.PascalCase => PascalCasePattern,
+            NamingConventionKind.CamelCase => CamelCasePattern,
+            NamingConventionKind.SnakeCase => SnakeCasePattern,
+            NamingConventionKind.KebabCase => KebabCasePattern,
+            NamingConventionKind.Hierarchical => PascalCasePattern,
+            NamingConventionKind.Custom => PascalCasePattern,
+            _ => PascalCasePattern,
+        };
+    }
 
     private static bool TryParseConvention(string value, out NamingConventionKind convention)
     {
