@@ -72,7 +72,7 @@ project, unlike `toolkit.xaml-constructor`.
   `Directory.Packages.props`) - the Roslyn version shipped with the latest
   Visual Studio 2022 17.14 line, so the analyzer stays loadable by any current
   VS 2022 install. See the
-  [Roslyn compatibility policy](policies/development.md#roslyn-compatibility).
+  [Roslyn compatibility policy](policies/build.md#roslyn-compatibility).
 - MinVer with the `v` tag prefix, as configured by `MinVerTagPrefix` in
   `Directory.Build.props`.
 - Tests target `net10.0` and use xUnit v3 through Microsoft.Testing.Platform,
@@ -83,29 +83,42 @@ project, unlike `toolkit.xaml-constructor`.
 
 ## Documentation layout
 
-- `AGENTS.md` links to the required repository guidance.
-- `docs/policies/development.md` contains the development policy.
+- `AGENTS.md` links to the required repository guidance and routes a change to the document that owns it.
+- `docs/policies/` contains the repository policies — the rules a change must follow. The
+  [policy index](policies/README.md) says what each policy covers.
 - `docs/repository.md` describes the project, repository structure, and technology stack.
-- `CHANGELOG.md` records changes under `Unreleased` before release.
+- `changelog.d/` holds the pending changelog fragments: a consumer-visible change adds one, and the
+  release preparation composes them into `CHANGELOG.md`; the rules are in the
+  [changelog policy](policies/changelog.md). Git does not track empty directories, so the folder
+  exists only while a fragment is pending.
+- `scripts/` holds the repository validator, the changelog tool and the release verification.
 
 The root solution exposes the documentation files under a `docs` solution folder in Visual Studio, preserving their subfolder structure. When adding documentation files, also add them as solution items; solution folders do not automatically include new files.
 
-The root `global.json` selects stable .NET SDK 10.0 (minimum `10.0.103`, `rollForward: latestFeature`). CI and publishing install the SDK from this file. Additional SDK installations may provide older test runtimes. See the [SDK selection policy](policies/development.md#net-sdk-selection).
+The root `global.json` selects stable .NET SDK 10.0 (minimum `10.0.103`, `rollForward: latestFeature`). CI and publishing install the SDK from this file. Additional SDK installations may provide older test runtimes. See the [SDK selection policy](policies/build.md#sdk-selection).
 
 ## Solution items
 
-The root solution exposes repository-level documents and configuration under `solutionItems`, GitHub files and maintenance scripts in matching subfolders, and documentation under `docs/`. The list is explicit, not a filesystem glob; keep links up to date when files change. See the [solution items policy](policies/development.md#solution-items).
+The root solution exposes repository-level documents and configuration under `solutionItems`, GitHub files and maintenance scripts in matching subfolders, and documentation under `docs/`. The list is explicit, not a filesystem glob; keep links up to date when files change. See the [solution items policy](policies/repository-maintenance.md#solution-items).
 
 ## Repository validation
 
 `scripts/Validate-Repository.ps1` enforces the required repository documents,
-their navigation links, and complete, valid Solution Items. The
-`.github/workflows/repository-policy.yml` workflow runs it for pushes and pull
-requests. See the [development policy](policies/development.md#repository-validation).
+their navigation links, the complete and valid Solution Items, and the workflow action pins. The
+`.github/workflows/repository-policy.yml` workflow runs it, the pending fragment check
+(`Update-Changelog.ps1 -Verify`) and the release structure check (`Verify-Release.ps1`) for pushes
+and pull requests. See the [repository maintenance policy](policies/repository-maintenance.md#repository-validation).
 
 ## Formatting
 
-The root `.editorconfig` defines the portable formatting baseline. Existing repositories may add stricter C# or analyzer-specific settings. See the [development policy](policies/development.md#formatting-baseline).
+The root `.editorconfig` defines the portable formatting baseline. Existing repositories may add stricter C# or analyzer-specific settings. See the [repository maintenance policy](policies/repository-maintenance.md#formatting-baseline).
+
+## Continuous integration
+
+`build-and-test` builds the solution in `Release` with warnings as errors and documentation
+warnings promoted to errors, runs the headless tests and uploads the package. `repository-policy`
+runs the validator, the pending fragment check and the release structure check. `publish-nuget` is
+manual and refuses a commit without a single stable tag and a matching changelog section.
 
 ## Testing
 
@@ -126,7 +139,7 @@ checked).
 
 ## Versioning and release tags
 
-The package uses MinVer 8 with stable tags in the `vMAJOR.MINOR.PATCH` format. The tag without its `v` prefix is the NuGet package version. Manual publishing accepts exactly one matching tag at HEAD and verifies the package ID and version before pushing to NuGet.
+The package uses MinVer 8 with stable tags in the `vMAJOR.MINOR.PATCH` format. The tag without its `v` prefix is the NuGet package version. `scripts/Verify-Release.ps1 -FromHeadTag` accepts exactly one matching tag at `HEAD`, and the publish workflow verifies the package ID and version before pushing to NuGet.
 
 Bump component, applied to analyzer-behavior changes:
 
@@ -136,4 +149,4 @@ Bump component, applied to analyzer-behavior changes:
 
 This mirrors ordinary SemVer, scoped to what actually changes for a consumer of the package: adding a diagnostic is additive (MINOR) even though it can make a previously-clean build start warning, because the new rule is new surface area, not a change to existing behavior.
 
-The tagged commit must already contain the release section in `CHANGELOG.md` with an empty `Unreleased` section above it; the publish workflow stops otherwise. See the [release changelog policy](policies/development.md#release-changelog).
+The tagged commit must already contain the release section in `CHANGELOG.md` with an empty `Unreleased` section above it and no pending fragment; the publish workflow stops otherwise. See the [release policy](policies/releases.md) and the [changelog policy](policies/changelog.md#release).
