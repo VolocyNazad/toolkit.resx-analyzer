@@ -21,6 +21,7 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
 {
     private static readonly Regex PlaceholderPattern = new(@"\{(\d+)(?:,-?\d+)?(?::[^{}]*)?\}", RegexOptions.None, TimeSpan.FromSeconds(1));
 
+    /// <summary>Gets the descriptors RESX001-RESX008 reported by this analyzer.</summary>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(
         DiagnosticDescriptors.MissingResourceKeyRule,
         DiagnosticDescriptors.ExtraResourceKeyRule,
@@ -31,6 +32,11 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
         DiagnosticDescriptors.OrphanedSatelliteRule,
         DiagnosticDescriptors.KeyNamingConventionRule);
 
+    /// <summary>
+    /// Registers the compilation action that analyzes the resource files added as additional files.
+    /// </summary>
+    /// <param name="context">The analysis context supplied by the compiler.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/>.</exception>
     public override void Initialize(AnalysisContext context)
     {
         _ = context ?? throw new ArgumentNullException(nameof(context));
@@ -80,7 +86,7 @@ public sealed class ResxCompletenessAnalyzer : DiagnosticAnalyzer
 
     private static IEnumerable<ResourceGroup> GroupResxFiles(ImmutableArray<AdditionalText> resxFiles, CancellationToken cancellationToken)
     {
-        Dictionary<string, ResourceGroup> groups = new(StringComparer.Ordinal);
+        Dictionary<string, ResourceGroup> groups = [];
 
         foreach (AdditionalText file in resxFiles)
         {
